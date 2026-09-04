@@ -142,7 +142,50 @@ def ben_graham_enhancement(image_np: np.ndarray) -> np.ndarray:
     return enhanced_rgb
 
 
+def check_image_quality(pil_img: Image.Image) -> dict:
+    """
+    Validates basic retinal image quality parameters (resolution, brightness, blurriness).
+    Returns a dict with pass/fail status, metrics, and advisory warning messages.
+    """
+    img_np = np.array(pil_img.convert("RGB"))
+    height, width, _ = img_np.shape
+    
+    gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+    mean_brightness = float(np.mean(gray))
+    
+    # Measure sharpness using Laplacian variance
+    laplacian_var = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    
+    warnings = []
+    
+    # 1. Resolution Check
+    if width < 200 or height < 200:
+        warnings.append(f"Image resolution ({width}x{height}px) is very low. Minimum recommended size is 200x200px.")
+        
+    # 2. Exposure Check
+    if mean_brightness < 25:
+        warnings.append(f"Image is underexposed or extremely dark (Average Brightness: {mean_brightness:.1f}/255).")
+    elif mean_brightness > 230:
+        warnings.append(f"Image is overexposed or extremely bright (Average Brightness: {mean_brightness:.1f}/255).")
+        
+    # 3. Sharpness Check
+    if laplacian_var < 15.0:
+        warnings.append(f"Image sharpness appears low or blurry (Focus score: {laplacian_var:.1f}).")
+        
+    is_adequate = len(warnings) == 0
+    
+    return {
+        "passed": is_adequate,
+        "warnings": warnings,
+        "width": width,
+        "height": height,
+        "mean_brightness": round(mean_brightness, 1),
+        "sharpness": round(laplacian_var, 1)
+    }
+
+
 def preprocess_image(pil_img: Image.Image, apply_enhancement: bool = False):
+
     """
     Preprocesses input PIL image into PyTorch tensor.
     
